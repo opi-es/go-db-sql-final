@@ -30,19 +30,20 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 
 func (s ParcelStore) Get(number int) (Parcel, error) {
 	// реализуйте чтение строки по заданному number
-	query := `SELECT number, client, status, address FROM parcel WHERE number = ?`
+	query := `SELECT number, client, status, address, created_at FROM parcel WHERE number = ?` // вот тут у меня ееще вылез баг после правок.
+	// не было поля креатед ат в методе гет и гет бай клиент
 	row := s.db.QueryRow(query, number)
 
 	// здесь из таблицы должна вернуться только одна строка
 
 	// заполните объект Parcel данными из таблицы
 	p := Parcel{}
-	err := row.Scan(&p.Number, &p.Client, &p.Status, &p.Address)
+	err := row.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			return Parcel{}, fmt.Errorf("посылка с номером %d не найдена", number)
+			return Parcel{}, fmt.Errorf("посылка с номером %d не найдена: %w", number, err)
 		}
-		return Parcel{}, fmt.Errorf("ошибка получения посылки %w", err)
+		return Parcel{}, fmt.Errorf("ошибка получения посылки: %w", err)
 	}
 
 	return p, nil
@@ -51,7 +52,7 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	// реализуйте чтение строк из таблицы parcel по заданному client
 	// здесь из таблицы может вернуться несколько строк
-	query := `SELECT number, client, status, address FROM parcel WHERE client = ?`
+	query := `SELECT number, client, status, address, created_at FROM parcel WHERE client = ?`
 	rows, err := s.db.Query(query, client)
 	if err != nil {
 		return nil, fmt.Errorf("ошибка получения посылок %w", err)
@@ -62,7 +63,7 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	var res []Parcel
 	for rows.Next() {
 		p := Parcel{}
-		err := rows.Scan(&p.Number, &p.Client, &p.Status, &p.Address)
+		err := rows.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 		if err != nil {
 			return nil, fmt.Errorf("ошибка скана %w", err)
 		}
@@ -88,8 +89,8 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 func (s ParcelStore) SetAddress(number int, address string) error {
 	// реализуйте обновление адреса в таблице parcel
 	// менять адрес можно только если значение статуса registered
-	query := `UPDATE parcel SET address = ? WHERE number = ? AND status = 'registered'`
-	_, err := s.db.Exec(query, address, number)
+	query := `UPDATE parcel SET address = ? WHERE number = ? AND status = ?`
+	_, err := s.db.Exec(query, address, number, ParcelStatusRegistered)
 	if err != nil {
 		return fmt.Errorf("ошибка обновления адреса %w", err)
 	}
@@ -100,8 +101,8 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 func (s ParcelStore) Delete(number int) error {
 	// реализуйте удаление строки из таблицы parcel
 	// удалять строку можно только если значение статуса registered
-	query := `DELETE FROM parcel WHERE number = ? AND status = 'registered'`
-	_, err := s.db.Exec(query, number)
+	query := `DELETE FROM parcel WHERE number = ? AND status = ?`
+	_, err := s.db.Exec(query, number, ParcelStatusRegistered)
 	if err != nil {
 		return fmt.Errorf("ошибка удаления %w", err)
 	}
